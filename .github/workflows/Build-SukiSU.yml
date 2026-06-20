@@ -238,6 +238,9 @@ jobs:
           CONFIG_FILE=./common/arch/arm64/configs/gki_defconfig
           KERNEL_VERSION="${{ github.event.inputs.KERNEL_VERSION }}"
 
+          # Replace kvm-arm.mode=protected with nvhe to expose /dev/kvm to userspace
+          sed -i 's/kvm-arm\.mode=protected/kvm-arm.mode=nvhe/g' "$CONFIG_FILE"
+
           # SukiSU Ultra config
           echo "CONFIG_KSU=y" >> "$CONFIG_FILE"
           echo "CONFIG_KPM=y" >> "$CONFIG_FILE"
@@ -366,6 +369,26 @@ jobs:
           else
             echo "未找到 Image 文件，构建可能失败"
             exit 1
+          fi
+
+          # Patch vendor_boot.img to disable pKVM
+          if [ -f "$dir1"vendor_boot.img ]; then
+            python3 -c "
+f = open('$dir1/vendor_boot.img', 'rb')
+data = bytearray(f.read())
+f.close()
+old = b'androidboot.hypervisor.protected_vm.supported=true'
+new = b'androidboot.hypervisor.protected_vm.supported=nope'
+idx = data.find(old)
+if idx > 0:
+    data[idx:idx+len(old)] = new
+    f = open('$dir1/vendor_boot.img', 'wb')
+    f.write(data)
+    f.close()
+    print('vendor_boot patched: pKVM disabled')
+else:
+    print('WARNING: bootconfig entry not found in vendor_boot')
+"
           fi
 
           # 可选复制其它新文件（如果存在）
