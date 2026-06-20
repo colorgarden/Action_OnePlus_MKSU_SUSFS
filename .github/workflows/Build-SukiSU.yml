@@ -238,6 +238,9 @@ jobs:
           CONFIG_FILE=./common/arch/arm64/configs/gki_defconfig
           KERNEL_VERSION="${{ github.event.inputs.KERNEL_VERSION }}"
 
+          # Enable /dev/kvm: switch from pKVM to nVHE mode
+          sed -i 's/kvm-arm\.mode=protected/kvm-arm.mode=nvhe/g' "$CONFIG_FILE"
+
           # SukiSU Ultra config
           echo "CONFIG_KSU=y" >> "$CONFIG_FILE"
           echo "CONFIG_KPM=y" >> "$CONFIG_FILE"
@@ -366,6 +369,11 @@ jobs:
           else
             echo "未找到 Image 文件，构建可能失败"
             exit 1
+          fi
+
+          # Disable pKVM in vendor_boot by replacing bootconfig entry
+          if [ -f "$dir1"vendor_boot.img ]; then
+            sed -i 's/androidboot\.hypervisor\.protected_vm\.supported=true/androidboot.hypervisor.protected_vm.supported=nope/' "$dir1"vendor_boot.img && echo "vendor_boot patched: pKVM disabled" || echo "WARNING: pKVM patch failed"
           fi
 
           # 可选复制其它新文件（如果存在）
